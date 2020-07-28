@@ -14,6 +14,7 @@ function DetailsArea() {
 
 	useEffect(() => {
 		setRoomId(randomService.generateRoomId(10))
+		console.log(JSON.parse(localStorage.getItem('user')))
 	}, [])
 
   const logout = async () => {
@@ -24,30 +25,13 @@ function DetailsArea() {
 
   const initClient = async () => {
     try {
-      const client = AgoraRTM.createInstance('ec567d18c6454a7eabb9de9dfda67bb2');
+      const client = AgoraRTM.createInstance('3e4d000b0a5e4bb59cc852ff4684d734');
       await client.on('ConnectionStateChange', async (newState, reason) => {
         console.log('on connection state changed to ' + newState + ' reason: ' + reason);
       });
+			setClient(client);
 
-      await client.login({ token: '', uid: roomId })
-      const channel = await client.createChannel(roomId);
-      setClient(client);
-      setChannel(channel);
-      // await joinChannel(roomId, client, channel);
-      await channel.join();
-      channel.on('ChannelMessage', (data, senderId) => {
-        console.log("Message Recieved")
-        console.log(data)
-        console.log(JSON.parse(data.text))
-        const jsonData = JSON.parse(data.text);
-        setStreamData({
-          channelName: jsonData.channel,
-          uid: jsonData.userOneUniqueId,
-          token: jsonData.userOneToken,
-          appId: 'ec567d18c6454a7eabb9de9dfda67bb2'
-        })
-      });
-      setChannel(channel)
+			console.log(JSON.parse(localStorage.getItem('user')).user._id)
     } catch(error) {
       console.log("Error: ", error);
     }
@@ -58,6 +42,23 @@ function DetailsArea() {
       await channel.leave();
     }
   }
+
+	const getSendableData = (data) => {
+		return {
+			type: "join_room",
+			token: data.userTwoToken,
+			uid: data.userTwoUniqueId.toString(),
+			tokenRtm: data.tokenRtm,
+			channel: data.channel,
+			callerid: "5ed915be9ad2f062dd359af6",
+			callerName: "AKsharma",
+			callerCountry: "",
+			callerLove: 0,
+			callerProfilePic: "",
+			callerUsername: "aksharma"
+		}
+
+	}
 
   const match = () => {
 		console.log(authService.getAuthHeader())
@@ -72,8 +73,10 @@ function DetailsArea() {
         console.log("200")
         const userTwoRoomId = res.data.user.roomId;
         await leaveChannel();
-        await client.logout()
-        await client.login({ token: '', uid: roomId })
+				// await client.logout()
+
+				const userOneUniqueId = parseInt(String(res.data.user._id).match(/\d/g).join("").slice(10));
+				await client.login({ token: null, uid: roomId })
         const channel = await client.createChannel(userTwoRoomId);
         setClient(client);
         setChannel(channel);
@@ -82,8 +85,11 @@ function DetailsArea() {
           console.log("Message Recieved")
           console.log(data)
         });
-        setChannel(channel)
-        channel.sendMessage({ text: JSON.stringify(res.data) }).then(() => {
+				setChannel(channel)
+				const sendableData = getSendableData(res.data);
+				console.log(sendableData)
+				console.log(JSON.stringify(sendableData))
+        channel.sendMessage({ text: JSON.stringify(sendableData) }).then(() => {
           console.log("Message sent successfully")
         }).catch(error => {
         /* Your code for handling events, such as a channel message-send failure. */
@@ -91,12 +97,34 @@ function DetailsArea() {
         });
         setStreamData({
           channelName: res.data.channel,
-          uid: res.data.userTwoUniqueId,
-          token: res.data.userTwoToken,
-          appId: 'ec567d18c6454a7eabb9de9dfda67bb2'
+          uid: res.data.userOneUniqueId,
+          token: res.data.userOneToken,
+          appId: '3e4d000b0a5e4bb59cc852ff4684d734'
         })
       } else if(res.data.messageCode === 201) {
-        console.log("Waiting for 15 seconds")
+				console.log("Waiting for 15 seconds")
+				console.log(res.data.tokenRtm)
+				await leaveChannel();
+				const userOneUniqueId = parseInt(String(JSON.parse(localStorage.getItem('user')).user._id).match(/\d/g).join("").slice(10));
+				await client.login({ token: "", uid: roomId })
+				const channel = await client.createChannel(roomId);
+
+				setChannel(channel);
+				// await joinChannel(roomId, client, channel);
+				await channel.join();
+				channel.on('ChannelMessage', (data, senderId) => {
+					console.log("Message Recieved")
+					console.log(data)
+					console.log(JSON.parse(data.text))
+					const jsonData = JSON.parse(data.text);
+					setStreamData({
+						channelName: jsonData.channel,
+						uid: jsonData.userTwoUniqueId,
+						token: jsonData.userTwoToken,
+						appId: '3e4d000b0a5e4bb59cc852ff4684d734'
+					})
+				});
+				setChannel(channel)
       }
     })
   }
